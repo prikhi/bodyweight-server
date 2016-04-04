@@ -18,6 +18,8 @@ library
   exposed-modules:     Api
                      , Config
                      , Models
+                     , Types
+                     , Routes
   build-depends:       base >= 4.7 && < 5
                      , servant
                      , servant-server
@@ -27,6 +29,7 @@ library
                      , mtl
                      , persistent-template
                      , persistent-postgresql
+                     , text
                      , transformers
                      , wai
                      , wai-extra

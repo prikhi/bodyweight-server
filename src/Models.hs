@@ -6,31 +6,94 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad.IO.Class       (MonadIO)
-import Control.Monad.Reader         (ReaderT, asks, liftIO, MonadReader)
-import Database.Persist.Postgresql  (SqlBackend(..), runMigration, runSqlPool,
-                                     SqlPersistT)
+import Control.Monad                (mzero)
+import Control.Monad.Reader         (ReaderT)
+import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
+                                     object, Value(..))
+import Data.Proxy                   (Proxy(..))
+import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
+import qualified Data.Text       as T
 
-import Config
-
-
-runDB :: (MonadIO m, MonadReader Config m) => SqlPersistT IO b -> m b
-runDB query = do
-    pool <- asks getPool
-    liftIO $ runSqlPool query pool
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 User json
-    name String
-    email String
-    deriving Show
+    name T.Text
+    email T.Text
+    isAdmin Bool default=False
+
+Subscription json
+    user UserId
+    routine RoutineId
+    UniqueSubscription user routine
+
+Routine json
+    name T.Text
+    author UserId Maybe
+    isPublic Bool
+    copyright T.Text
+    UniqueRoutine name
+
+Section json
+    name T.Text
+    routine RoutineId
+    UniqueSection name routine
+
+SectionExercise json
+    order Int
+    section SectionId
+    exercises [ExerciseId]
+    setCount Int
+    repCount Int
+    restAfter Bool
+
+Exercise json
+    name T.Text
+    description T.Text
+    isHold Bool
+    youtubeIds T.Text
+    amazonIds T.Text
+    copyright T.Text
 |]
 
 doMigrations :: ReaderT SqlBackend IO ()
 doMigrations = runMigration migrateAll
+
+
+class Named a where
+        name :: Proxy a -> T.Text
+
+instance Named User where name _ = "user"
+instance Named Subscription where name _ = "subscription"
+instance Named Routine where name _ = "routine"
+instance Named Section where name _ = "section"
+instance Named SectionExercise where name _ = "sectionExercise"
+instance Named Exercise where name _ = "exercise"
+
+instance Named a => Named (Entity a) where
+        name _ = name (Proxy :: Proxy a)
+
+
+data JSONList a = JSONList [a]
+instance (FromJSON a, Named a) => FromJSON (JSONList a) where
+        parseJSON (Object o) = do
+            named <- o .: name (Proxy :: Proxy a) >>= parseJSON
+            return $ JSONList [named]
+        parseJSON _          = mzero
+instance (ToJSON a, Named a) => ToJSON (JSONList a) where
+        toJSON (JSONList l)  = object [name (Proxy :: Proxy a) .= map toJSON l]
+
+data JSONObject a = JSONObject a
+instance (FromJSON a, Named a) => FromJSON (JSONObject a) where
+        parseJSON (Object o) = do
+            named <- o .: name (Proxy :: Proxy a) >>= parseJSON
+            return $ JSONObject named
+        parseJSON _          = mzero
+instance (ToJSON a, Named a) => ToJSON (JSONObject a) where
+        toJSON (JSONObject a)  = object [name (Proxy :: Proxy a) .= toJSON a]
