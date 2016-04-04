@@ -32,11 +32,17 @@ api = Proxy
 
 type API = "users" :> UserAPI
       :<|> "subscriptions" :> SubscriptionAPI
+      :<|> "routines" :> RoutineAPI
+      :<|> "sections" :> SectionAPI
+      :<|> "sectionExercises" :> SectionExerciseAPI
       :<|> "exercises" :> ExerciseAPI
 
 server :: ServerT API AppM
 server = userRoutes
     :<|> subscriptionRoutes
+    :<|> routineRoutes
+    :<|> sectionRoutes
+    :<|> sectionExerciseRoutes
     :<|> exerciseRoutes
 
 type UserAPI = CRUD User
@@ -50,3 +56,15 @@ subscriptionRoutes = crudRoutes
 type ExerciseAPI = CRUD Exercise
 exerciseRoutes :: CRUDRoutes Exercise
 exerciseRoutes = crudRoutes
+
+type RoutineAPI = CRUD Routine
+routineRoutes :: CRUDRoutes Routine
+routineRoutes = crudRoutes
+
+type SectionAPI = CRUD Section
+sectionRoutes :: CRUDRoutes Section
+sectionRoutes = crudRoutes
+
+type SectionExerciseAPI = CRUD SectionExercise
+sectionExerciseRoutes :: CRUDRoutes SectionExercise
+sectionExerciseRoutes = crudRoutes
