@@ -2,7 +2,7 @@ server: build
 	stack exec bodyweight-server-exe
 
 watch: build
-	stack build --pedantic --file-watch
+	stack -j4 build --pedantic --file-watch
 
 clean:
 	stack clean
@@ -12,7 +12,7 @@ maintainer-clean:
 
 
 build: install ./src/** ./app/** bodyweight-server.cabal Setup.hs
-	stack build --pedantic
+	stack -j4 build --pedantic
 
 install: bodyweight-server.cabal
-	stack install --only-dependencies
+	stack -j4 install --only-dependencies
