@@ -35,8 +35,7 @@ type CRUDRoutes resource =
     :<|> ((Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
     :<|> (Key resource -> AppM ()))))
 
-crudRoutes :: (PersistEntityBackend r ~ SqlBackend, PersistEntity r,
-               ToBackendKey SqlBackend r)
+crudRoutes :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
            => CRUDRoutes r
 crudRoutes =    listRoute
            :<|> createRoute
@@ -60,8 +59,7 @@ createRoute (JSONObject item) = do
 
 -- | The `viewRoute` returns a single JSON object representing a Persistent
 -- Entity.
-viewRoute :: (PersistEntityBackend r ~ SqlBackend, PersistEntity r,
-              ToBackendKey SqlBackend r)
+viewRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
           => Key r -> AppM (JSONObject (Entity r))
 viewRoute key =  do
         maybeItem <- runDB $ get key
@@ -71,16 +69,14 @@ viewRoute key =  do
 
 -- | The `updateRoute` attempts to update an Entity using a JSON request
 -- body and returns the new Entity.
-updateRoute :: (PersistEntityBackend r ~ SqlBackend, PersistEntity r,
-                ToBackendKey SqlBackend r)
+updateRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
             => Key r -> JSONObject r -> AppM (JSONObject (Entity r))
 updateRoute key (JSONObject item) = do
         runDB $ replace key item
         return . JSONObject $ Entity key item
 
 -- | The `deleteRoute` deletes the Entity, if it exists.
-deleteRoute :: (PersistEntityBackend r ~ SqlBackend, PersistEntity r,
-                ToBackendKey SqlBackend r)
+deleteRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
             => Key r -> AppM ()
 deleteRoute key = do
         maybeItem <- runDB $ get key
