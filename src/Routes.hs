@@ -35,7 +35,8 @@ type CRUDRoutes resource =
     :<|> ((Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
     :<|> (Key resource -> AppM ()))))
 
-crudRoutes :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
+crudRoutes :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
+              , DeleteRelated r)
            => CRUDRoutes r
 crudRoutes =    listRoute
            :<|> createRoute
@@ -76,10 +77,11 @@ updateRoute key (JSONObject item) = do
         return . JSONObject $ Entity key item
 
 -- | The `deleteRoute` deletes the Entity, if it exists.
-deleteRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
+deleteRoute :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
+               , DeleteRelated r)
             => Key r -> AppM ()
 deleteRoute key = do
         maybeItem <- runDB $ get key
         case maybeItem of
             Nothing -> lift $ throwE err404
-            _       -> runDB $ delete key
+            _       -> runDB $ deleteRelated key >> delete key

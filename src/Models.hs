@@ -12,11 +12,12 @@
 module Models where
 
 import Control.Monad                (mzero)
-import Control.Monad.Reader         (ReaderT)
+import Control.Monad.Reader         (ReaderT, MonadIO)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
 import Data.Proxy                   (Proxy(..))
-import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..))
+import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..),
+                                     Key, deleteWhere, (==.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
 import qualified Data.Text       as T
@@ -97,3 +98,22 @@ instance (FromJSON a, Named a) => FromJSON (JSONObject a) where
         parseJSON _          = mzero
 instance (ToJSON a, Named a) => ToJSON (JSONObject a) where
         toJSON (JSONObject a)  = object [name (Proxy :: Proxy a) .= toJSON a]
+
+
+class DeleteRelated a where
+        deleteRelated :: (MonadIO m) => Key a -> ReaderT SqlBackend m ()
+        deleteRelated _ = return ()
+
+instance DeleteRelated Subscription
+instance DeleteRelated SectionExercise
+instance DeleteRelated Exercise
+
+instance DeleteRelated User where
+        deleteRelated key =
+            deleteWhere [SubscriptionUser ==. key]
+instance DeleteRelated Routine where
+        deleteRelated key =
+            deleteWhere [SectionRoutine ==. key]
+instance DeleteRelated Section where
+        deleteRelated key =
+            deleteWhere [SectionExerciseSection ==. key]
