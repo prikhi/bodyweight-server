@@ -44,6 +44,7 @@ Routine json
 Section json
     name T.Text
     routine RoutineId
+    order Int
     UniqueSection name routine
 
 SectionExercise json
@@ -52,6 +53,9 @@ SectionExercise json
     exercises [ExerciseId]
     setCount Int
     repCount Int
+    holdTime Int
+    repsToProgress Int
+    timeToProgress Int
     restAfter Bool
 
 Exercise json
