@@ -36,6 +36,7 @@ type API = "users" :> UserAPI
       :<|> "sections" :> SectionAPI
       :<|> "sectionExercises" :> SectionExerciseAPI
       :<|> "exercises" :> ExerciseAPI
+      :<|> "routineLogs" :> RoutineLogAPI
 
 server :: ServerT API AppM
 server = userRoutes
@@ -44,6 +45,7 @@ server = userRoutes
     :<|> sectionRoutes
     :<|> sectionExerciseRoutes
     :<|> exerciseRoutes
+    :<|> routineLogRoutes
 
 type UserAPI = CRUD User
 userRoutes :: CRUDRoutes User
@@ -68,3 +70,7 @@ sectionRoutes = crudRoutes
 type SectionExerciseAPI = CRUD SectionExercise
 sectionExerciseRoutes :: CRUDRoutes SectionExercise
 sectionExerciseRoutes = crudRoutes
+
+type RoutineLogAPI = CRUD RoutineLog
+routineLogRoutes :: CRUDRoutes RoutineLog
+routineLogRoutes = crudRoutes

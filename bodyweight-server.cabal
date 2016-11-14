@@ -30,6 +30,7 @@ library
                      , persistent-template
                      , persistent-postgresql
                      , text
+                     , time
                      , transformers
                      , wai
                      , wai-extra

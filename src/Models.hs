@@ -16,6 +16,8 @@ import Control.Monad.Reader         (ReaderT, MonadIO)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
 import Data.Proxy                   (Proxy(..))
+import Data.Time.Calendar           (Day)
+import Data.Time.LocalTime          (TimeOfDay)
 import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..),
                                      Key, deleteWhere, (==.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
@@ -65,6 +67,17 @@ Exercise json
     youtubeIds T.Text
     amazonIds T.Text
     copyright T.Text
+
+RoutineLog json
+    date Day
+    routine RoutineId
+    startTime TimeOfDay
+    stopTime TimeOfDay
+    startWeight Int
+    stopWeight Int
+    notes T.Text
+    UniqueRoutineLog date routine
+
 |]
 
 doMigrations :: ReaderT SqlBackend IO ()
@@ -80,6 +93,7 @@ instance Named Routine where name _ = "routine"
 instance Named Section where name _ = "section"
 instance Named SectionExercise where name _ = "sectionExercise"
 instance Named Exercise where name _ = "exercise"
+instance Named RoutineLog where name _ = "routineLog"
 
 instance Named a => Named (Entity a) where
         name _ = name (Proxy :: Proxy a)
@@ -111,6 +125,7 @@ class DeleteRelated a where
 instance DeleteRelated Subscription
 instance DeleteRelated SectionExercise
 instance DeleteRelated Exercise
+instance DeleteRelated RoutineLog
 
 instance DeleteRelated User where
         deleteRelated key =
