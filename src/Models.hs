@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad                (mzero)
+import Control.Monad                (mzero, void)
 import Control.Monad.Reader         (ReaderT, MonadIO)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
@@ -19,7 +19,7 @@ import Data.Proxy                   (Proxy(..))
 import Data.Time.Calendar           (Day)
 import Data.Time.LocalTime          (TimeOfDay)
 import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..),
-                                     Key, deleteWhere, (==.))
+                                     Key, deleteWhere, selectList, (==.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
 import qualified Data.Text       as T
@@ -131,7 +131,9 @@ instance DeleteRelated User where
         deleteRelated key =
             deleteWhere [SubscriptionUser ==. key]
 instance DeleteRelated Routine where
-        deleteRelated key =
+        deleteRelated key = do
+            sections <- selectList [SectionRoutine ==. key] []
+            void $ mapM (\(Entity k _) -> deleteRelated k) sections
             deleteWhere [SectionRoutine ==. key]
 instance DeleteRelated Section where
         deleteRelated key =
