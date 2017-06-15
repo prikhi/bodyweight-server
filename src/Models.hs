@@ -40,11 +40,13 @@ Routine json
     name T.Text
     author UserId Maybe
     isPublic Bool
+    description T.Text
     copyright T.Text
     UniqueRoutine name
 
 Section json
     name T.Text
+    description T.Text
     routine RoutineId
     order Int
     UniqueSection name routine
