@@ -21,6 +21,15 @@ pacman -S stack
 make
 ```
 
+## TODO
+
+* Settings
+    * Document expected Environmental Variables
+* User Auth
+    * Protect Create/Update/Delete Routes
+    * Tie Users into Other Models
+* Format code like elm-format
+
 ## License
 
 GPL-3.0
