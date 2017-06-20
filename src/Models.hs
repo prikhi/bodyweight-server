@@ -26,10 +26,14 @@ import qualified Data.Text       as T
 
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-User json
+User
     name T.Text
     email T.Text
+    encryptedPassword T.Text
+    authToken T.Text
     isAdmin Bool default=False
+    UniqueToken authToken
+    UniqueUserName name
 
 Subscription json
     user UserId
@@ -84,6 +88,19 @@ RoutineLog json
 
 doMigrations :: ReaderT SqlBackend IO ()
 doMigrations = runMigration migrateAll
+
+
+-- | Hide the encrypted password when converting a User to JSON.
+instance ToJSON (Entity User) where
+    toJSON (Entity userId user) =
+        object
+            [ "email" .= userEmail user
+            , "authToken" .= userAuthToken user
+            , "name" .= userName user
+            , "isAdmin" .= userIsAdmin user
+            , "id" .= userId
+            ]
+
 
 
 class Named a where

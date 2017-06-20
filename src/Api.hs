@@ -9,15 +9,17 @@ import Control.Monad.Trans.Except       (ExceptT)
 import Network.Wai                      (Application)
 import Servant
 
+import Auth
 import Config
 import Models
 import Types
 import Routes
+import Routes.Users
 
 
 -- Application
 app :: Config -> Application
-app cfg = serve api (readerServer cfg)
+app cfg = serveWithContext api authServerContext (readerServer cfg)
 
 readerServer :: Config -> Server API
 readerServer cfg = enter (readerToExcept cfg) server
@@ -46,10 +48,6 @@ server = userRoutes
     :<|> sectionExerciseRoutes
     :<|> exerciseRoutes
     :<|> routineLogRoutes
-
-type UserAPI = CRUD User
-userRoutes :: CRUDRoutes User
-userRoutes = crudRoutes
 
 type SubscriptionAPI = CRUD Subscription
 subscriptionRoutes :: CRUDRoutes Subscription

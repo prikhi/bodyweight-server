@@ -16,14 +16,18 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Api
+                     , Auth
                      , Config
                      , Models
                      , Types
                      , Routes
+                     , Routes.Users
   build-depends:       base >= 4.7 && < 5
                      , servant
                      , servant-server
                      , aeson
+                     , bcrypt
+                     , bytestring
                      , either
                      , monad-logger
                      , mtl
@@ -32,6 +36,7 @@ library
                      , text
                      , time
                      , transformers
+                     , uuid
                      , wai
                      , wai-extra
                      , warp
