@@ -28,6 +28,7 @@ make
 * User Auth
     * Protect Create/Update/Delete Routes
     * Tie Users into Other Models
+    * When checking passwords against hashes, make sure the hash uses the latest hashing policy
 * Format code like elm-format
 
 ## License

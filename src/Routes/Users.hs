@@ -24,6 +24,7 @@ import qualified Data.Text as T
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID4
 
+import Auth (lookupUser)
 import Types
 import Models
 
@@ -48,6 +49,15 @@ data LoginData
 
 instance FromJSON LoginData
 
+-- | The expected data when reauthorizing a User.
+data ReauthData
+    = ReauthData
+    { authToken :: T.Text
+    , authUserId :: Key User
+    } deriving (Generic, Show)
+
+instance FromJSON ReauthData
+
 
 type UserAPI =
          "register"
@@ -56,17 +66,22 @@ type UserAPI =
     :<|> "login"
          :> ReqBody '[JSON] LoginData
          :> Post '[JSON] (JSONObject (Entity User))
+    :<|> "reauthorize"
+         :> ReqBody '[JSON] ReauthData
+         :> Post '[JSON] (JSONObject (Entity User))
 
 
 type UserRoutes =
          (RegistrationData -> AppM (JSONObject (Entity User)))
     :<|> (LoginData -> AppM (JSONObject (Entity User)))
+    :<|> (ReauthData -> AppM (JSONObject (Entity User)))
 
 
 userRoutes :: UserRoutes
 userRoutes =
          registrationRoute
     :<|> loginRoute
+    :<|> reauthorizeRoute
 
 
 -- | Register a User by creating a User & Token for them.
@@ -105,3 +120,13 @@ loginRoute LoginData { loginName, loginPassword } = do
                         return . JSONObject $ userEntity
                     else
                         lift . throwE $ err404
+
+
+-- | Re-Authorize a User using their Auth Token.
+reauthorizeRoute :: ReauthData -> AppM (JSONObject (Entity User))
+reauthorizeRoute ReauthData { authToken, authUserId } = do
+    userEntity@(Entity userId _) <- lookupUser authToken
+    if authUserId == userId then
+        return $ JSONObject userEntity
+    else
+        lift $ throwE err404
