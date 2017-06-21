@@ -30,6 +30,7 @@ make
     * Tie Users into Other Models
     * When checking passwords against hashes, make sure the hash uses the latest hashing policy
 * Format code like elm-format
+* Add Markdown Docs using servant-doc.
 
 ## License
 
