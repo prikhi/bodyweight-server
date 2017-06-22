@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad                (mzero, void)
+import Control.Monad                (mzero)
 import Control.Monad.Reader         (ReaderT, MonadIO)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
@@ -118,7 +118,7 @@ instance Named a => Named (Entity a) where
         name _ = name (Proxy :: Proxy a)
 
 
-data JSONList a = JSONList [a]
+newtype JSONList a = JSONList [a]
 instance (FromJSON a, Named a) => FromJSON (JSONList a) where
         parseJSON (Object o) = do
             named <- o .: name (Proxy :: Proxy a) >>= parseJSON
@@ -127,7 +127,7 @@ instance (FromJSON a, Named a) => FromJSON (JSONList a) where
 instance (ToJSON a, Named a) => ToJSON (JSONList a) where
         toJSON (JSONList l)  = object [name (Proxy :: Proxy a) .= map toJSON l]
 
-data JSONObject a = JSONObject a
+newtype JSONObject a = JSONObject a
 instance (FromJSON a, Named a) => FromJSON (JSONObject a) where
         parseJSON (Object o) = do
             named <- o .: name (Proxy :: Proxy a) >>= parseJSON
@@ -152,7 +152,7 @@ instance DeleteRelated User where
 instance DeleteRelated Routine where
         deleteRelated key = do
             sections <- selectList [SectionRoutine ==. key] []
-            void $ mapM (\(Entity k _) -> deleteRelated k) sections
+            mapM_ (\(Entity k _) -> deleteRelated k) sections
             deleteWhere [SectionRoutine ==. key]
 instance DeleteRelated Section where
         deleteRelated key =
