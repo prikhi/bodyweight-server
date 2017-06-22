@@ -42,7 +42,7 @@ Subscription json
 
 Routine json
     name T.Text
-    author UserId Maybe
+    author UserId
     isPublic Bool
     description T.Text
     copyright T.Text
