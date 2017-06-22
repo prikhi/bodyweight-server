@@ -11,19 +11,23 @@
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad                (mzero)
-import Control.Monad.Reader         (ReaderT, MonadIO)
+import Control.Monad                (mzero, unless, when)
+import Control.Monad.Reader         (ReaderT, MonadIO, lift)
+import Control.Monad.Trans.Except   (throwE)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
 import Data.Proxy                   (Proxy(..))
 import Data.Time.Calendar           (Day)
 import Data.Time.LocalTime          (TimeOfDay)
 import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..),
-                                     Key, deleteWhere, selectList, (==.))
+                                     Key, deleteWhere, selectList, (==.), get)
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
+import Servant                      (err403, err404)
+
 import qualified Data.Text       as T
 
+import Types
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 User
@@ -157,3 +161,62 @@ instance DeleteRelated Routine where
 instance DeleteRelated Section where
         deleteRelated key =
             deleteWhere [SectionExerciseSection ==. key]
+
+
+-- | The GuardCRUD Typeclass is used to verify the user has the correct
+-- permissions to perform the specified action for each CRUD Route.
+class GuardCRUD a where
+
+    -- | Guard the Create Route. The default instace will simply ensure
+    -- a registered user is performing the action.
+    guardCreate :: a -> Maybe (Entity User) -> AppM ()
+    guardCreate _ =
+        maybe forbidden (const $ return ())
+
+instance GuardCRUD Subscription
+instance GuardCRUD Routine
+instance GuardCRUD RoutineLog
+
+instance GuardCRUD Section where
+    guardCreate _ Nothing =
+        forbidden
+    -- | Only Routine Authors should be able to Create Sections for their
+    -- Routines.
+    guardCreate section (Just (Entity userId _)) =
+        authorIsUser userId . runDB . get $ sectionRoutine section
+
+instance GuardCRUD SectionExercise where
+    guardCreate _ Nothing =
+        forbidden
+    -- | Only Routine Authors should be able to Create SectionExercises for
+    -- their Routines.
+    guardCreate sectionExercise (Just (Entity userId _)) = do
+        maybeSection <- runDB . get $ sectionExerciseSection sectionExercise
+        authorIsUser userId $ case maybeSection of
+            Nothing ->
+                return Nothing
+            Just section ->
+                runDB . get $ sectionRoutine section
+
+instance GuardCRUD Exercise where
+    -- | Only Admins should be able to Create Exercises
+    guardCreate _ Nothing =
+        forbidden
+    guardCreate _ (Just (Entity _ user)) =
+        unless (userIsAdmin user) forbidden
+
+-- | A helper function that can be used when a guard should return a 403
+-- error.
+forbidden :: AppM b
+forbidden =
+    lift $ throwE err403
+
+-- | A helper function to verify a Routine's Author matches a User's ID.
+authorIsUser :: Key User -> AppM (Maybe Routine) -> AppM ()
+authorIsUser userId maybeRoutineM = do
+    maybeRoutine <- maybeRoutineM
+    case maybeRoutine of
+        Nothing ->
+            lift $ throwE err404
+        Just routine ->
+            when (routineAuthor routine /= userId) forbidden
