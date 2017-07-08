@@ -24,18 +24,20 @@ type CRUD resource =
         :> Post '[JSON] (JSONObject (Entity resource))
    :<|> Capture "id" (Key resource)
         :> Get '[JSON] (JSONObject (Entity resource))
-   :<|> Capture "id" (Key resource)
+   :<|> AuthProtect "token-auth"
+        :> Capture "id" (Key resource)
         :> ReqBody '[JSON] (JSONObject resource)
         :> Put '[JSON] (JSONObject (Entity resource))
-   :<|> Capture "id" (Key resource)
+   :<|> AuthProtect "token-auth"
+        :> Capture "id" (Key resource)
         :> Delete '[JSON] ()
 
 type CRUDRoutes resource =
          AppM (JSONList (Entity resource))
     :<|> ((Maybe TokenString -> JSONObject resource -> AppM (JSONObject (Entity resource)))
     :<|> ((Key resource -> AppM (JSONObject (Entity resource)))
-    :<|> ((Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
-    :<|> (Key resource -> AppM ()))))
+    :<|> ((Maybe TokenString -> Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
+    :<|> (Maybe TokenString -> Key resource -> AppM ()))))
 
 crudRoutes :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
               , DeleteRelated r, GuardCRUD r)
@@ -74,21 +76,26 @@ viewRoute key =  do
 
 -- | The `updateRoute` attempts to update an Entity using a JSON request
 -- body and returns the new Entity.
-updateRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
-            => Key r -> JSONObject r -> AppM (JSONObject (Entity r))
-updateRoute key (JSONObject item) = do
+updateRoute :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
+               , GuardCRUD r )
+            => Maybe TokenString -> Key r -> JSONObject r -> AppM (JSONObject (Entity r))
+updateRoute maybeToken key (JSONObject item) = do
+        mapTokenToGuard maybeToken $ guardUpdate (Entity key item)
         runDB $ replace key item
         return . JSONObject $ Entity key item
 
 -- | The `deleteRoute` deletes the Entity, if it exists.
 deleteRoute :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
-               , DeleteRelated r)
-            => Key r -> AppM ()
-deleteRoute key = do
+               , DeleteRelated r, GuardCRUD r)
+            => Maybe TokenString -> Key r -> AppM ()
+deleteRoute maybeToken key = do
         maybeItem <- runDB $ get key
         case maybeItem of
-            Nothing -> lift $ throwE err404
-            _       -> runDB $ deleteRelated key >> delete key
+            Nothing ->
+                lift $ throwE err404
+            Just item ->
+                mapTokenToGuard maybeToken (guardDelete $ Entity key item) >>
+                runDB (deleteRelated key >> delete key)
 
 
 -- | Map a Potential Token onto a Guard Function

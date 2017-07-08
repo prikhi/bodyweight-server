@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad                (mzero, unless, when)
+import Control.Monad                (mzero, unless)
 import Control.Monad.Reader         (ReaderT, MonadIO, lift)
 import Control.Monad.Trans.Except   (throwE)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
@@ -173,30 +173,66 @@ class GuardCRUD a where
     guardCreate _ =
         maybe forbidden (const $ return ())
 
+    -- | Guard the Update Route. The default instance will simply use the
+    -- guardCreate Route.
+    guardUpdate :: Entity a -> Maybe (Entity User) -> AppM ()
+    guardUpdate (Entity _ a) =
+        guardCreate a
+
+    -- | Guard the Delete Route. The default instance will only allow Admin
+    -- users to delete the Resource.
+    guardDelete :: Entity a -> Maybe (Entity User) -> AppM ()
+    guardDelete _ Nothing =
+        forbidden
+    guardDelete _ (Just (Entity _ user)) =
+        unless (userIsAdmin user) forbidden
+
 instance GuardCRUD Subscription
-instance GuardCRUD Routine
 instance GuardCRUD RoutineLog
+
+instance GuardCRUD Routine where
+    guardUpdate _ Nothing =
+        forbidden
+    -- | Only Authors & Admins should be able to Update their Routines.
+    guardUpdate (Entity routineId _) (Just user) = do
+        userIsAuthorOrAdmin user . runDB $ get routineId
+
+    guardDelete _ Nothing =
+        forbidden
+    -- | Only Authors & Admins should be able to Delete a Routine.
+    guardDelete (Entity _ routine) (Just (Entity userId user)) =
+        unless (routineAuthor routine == userId || userIsAdmin user) forbidden
 
 instance GuardCRUD Section where
     guardCreate _ Nothing =
         forbidden
-    -- | Only Routine Authors should be able to Create Sections for their
-    -- Routines.
-    guardCreate section (Just (Entity userId _)) =
-        authorIsUser userId . runDB . get $ sectionRoutine section
+    -- | Only Routine Authors or Admins should be able to Create Sections
+    -- for a Routine.
+    guardCreate section (Just user) =
+        userIsAuthorOrAdmin user . runDB . get $ sectionRoutine section
+
+    -- | Only Routine Authors & Admins should be able to Delete Sections
+    -- for a Routine.
+    guardDelete (Entity _ section) =
+        guardCreate section
 
 instance GuardCRUD SectionExercise where
     guardCreate _ Nothing =
         forbidden
-    -- | Only Routine Authors should be able to Create SectionExercises for
-    -- their Routines.
-    guardCreate sectionExercise (Just (Entity userId _)) = do
+    -- | Only Routine Authors or Admins should be able to Create
+    -- SectionExercises for their Routines.
+    guardCreate sectionExercise (Just user) = do
         maybeSection <- runDB . get $ sectionExerciseSection sectionExercise
-        authorIsUser userId $ case maybeSection of
+        userIsAuthorOrAdmin user $ case maybeSection of
             Nothing ->
                 return Nothing
             Just section ->
                 runDB . get $ sectionRoutine section
+
+    -- | Only Routine Authors or Admins should be able to Delete
+    -- SectionExercises for a Routine.
+    guardDelete (Entity _ sectionExercise) =
+        guardCreate sectionExercise
 
 instance GuardCRUD Exercise where
     -- | Only Admins should be able to Create Exercises
@@ -211,12 +247,12 @@ forbidden :: AppM b
 forbidden =
     lift $ throwE err403
 
--- | A helper function to verify a Routine's Author matches a User's ID.
-authorIsUser :: Key User -> AppM (Maybe Routine) -> AppM ()
-authorIsUser userId maybeRoutineM = do
+-- | A helper function to verify a User is a Routine's Author or an Admin.
+userIsAuthorOrAdmin :: Entity User -> AppM (Maybe Routine) -> AppM ()
+userIsAuthorOrAdmin (Entity userId user) maybeRoutineM = do
     maybeRoutine <- maybeRoutineM
     case maybeRoutine of
         Nothing ->
             lift $ throwE err404
         Just routine ->
-            when (routineAuthor routine /= userId) forbidden
+            unless (routineAuthor routine == userId || userIsAdmin user) forbidden

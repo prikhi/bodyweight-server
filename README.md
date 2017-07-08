@@ -26,7 +26,6 @@ make
 * Settings
     * Document expected Environmental Variables
 * User Auth
-    * Protect Create/Update/Delete Routes
     * Tie Users into Other Models
     * When checking passwords against hashes, make sure the hash uses the latest hashing policy
 * Refactor all the `lift $ throwE` calls into a `serverError` function
