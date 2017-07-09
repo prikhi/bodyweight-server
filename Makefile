@@ -1,7 +1,7 @@
 server: build
 	stack exec bodyweight-server-exe
 
-watch: build
+watch: install
 	stack -j4 build --pedantic --file-watch
 
 clean:
