@@ -18,7 +18,8 @@ import Types
 
 
 type CRUD resource =
-        Get '[JSON] (JSONList (Entity resource))
+        AuthProtect "token-auth"
+        :> Get '[JSON] (JSONList (Entity resource))
    :<|> AuthProtect "token-auth"
         :> ReqBody '[JSON] (JSONObject resource)
         :> Post '[JSON] (JSONObject (Entity resource))
@@ -33,7 +34,7 @@ type CRUD resource =
         :> Delete '[JSON] ()
 
 type CRUDRoutes resource =
-         AppM (JSONList (Entity resource))
+         (Maybe TokenString -> AppM (JSONList (Entity resource)))
     :<|> ((Maybe TokenString -> JSONObject resource -> AppM (JSONObject (Entity resource)))
     :<|> ((Key resource -> AppM (JSONObject (Entity resource)))
     :<|> ((Maybe TokenString -> Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
@@ -49,10 +50,13 @@ crudRoutes =    listRoute
            :<|> deleteRoute
 
 -- | The `listRoute` returns a JSON Array of Persistent Entities.
-listRoute :: (PersistEntityBackend r ~ SqlBackend, PersistEntity r)
-          => AppM (JSONList (Entity r))
-listRoute = do items <- runDB (selectList [] [])
-               return $ JSONList items
+listRoute :: ( PersistEntityBackend r ~ SqlBackend, PersistEntity r
+             , GuardCRUD r )
+          => Maybe TokenString -> AppM (JSONList (Entity r))
+listRoute maybeToken =
+        fmap JSONList $
+            mapTokenToGuard maybeToken guardList >>=
+            runDB . flip selectList []
 
 -- | The `createRoute` parses a JSON request body & inserts the value into
 -- the database if it is valid.
@@ -99,7 +103,7 @@ deleteRoute maybeToken key = do
 
 
 -- | Map a Potential Token onto a Guard Function
-mapTokenToGuard :: Maybe TokenString -> (Maybe (Entity User) -> AppM ()) -> AppM ()
+mapTokenToGuard :: Maybe TokenString -> (Maybe (Entity User) -> AppM a) -> AppM a
 mapTokenToGuard maybeToken guardFunction =
         case maybeToken of
             Nothing ->

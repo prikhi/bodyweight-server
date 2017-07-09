@@ -19,8 +19,11 @@ import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
 import Data.Proxy                   (Proxy(..))
 import Data.Time.Calendar           (Day)
 import Data.Time.LocalTime          (TimeOfDay)
-import Database.Persist.Postgresql  (SqlBackend(..), runMigration, Entity(..),
-                                     Key, deleteWhere, selectList, (==.), get)
+import Database.Persist.Postgresql  (PersistEntityBackend, PersistEntity,
+                                     SqlBackend(..), runMigration, Entity(..),
+                                     EntityField, Key, deleteWhere, get,
+                                     selectList, Filter, selectKeysList,
+                                     (==.), (||.), (<-.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
 import Servant                      (err403, err404)
@@ -187,6 +190,12 @@ class GuardCRUD a where
     guardDelete _ (Just (Entity _ user)) =
         unless (userIsAdmin user) forbidden
 
+    -- | Guard the List Route by returning a list of Filters to apply to
+    -- the `selectList` query. The default instance does no filtering.
+    guardList :: Maybe (Entity User) -> AppM [Filter a]
+    guardList _ =
+        return []
+
 instance GuardCRUD Subscription
 instance GuardCRUD RoutineLog
 
@@ -194,7 +203,7 @@ instance GuardCRUD Routine where
     guardUpdate _ Nothing =
         forbidden
     -- | Only Authors & Admins should be able to Update their Routines.
-    guardUpdate (Entity routineId _) (Just user) = do
+    guardUpdate (Entity routineId _) (Just user) =
         userIsAuthorOrAdmin user . runDB $ get routineId
 
     guardDelete _ Nothing =
@@ -202,6 +211,20 @@ instance GuardCRUD Routine where
     -- | Only Authors & Admins should be able to Delete a Routine.
     guardDelete (Entity _ routine) (Just (Entity userId user)) =
         unless (routineAuthor routine == userId || userIsAdmin user) forbidden
+
+    -- | Anonymous Users should only see Public Routines.
+    guardList Nothing =
+        return [ RoutineIsPublic ==. True ]
+    -- | Authorized Users should be shown all Public Routines as well as
+    -- their Private Routines & Administrators should be shown all
+    -- Routines.
+    guardList (Just (Entity userId user)) =
+        if userIsAdmin user then
+            return []
+        else
+            return $
+                [ RoutineIsPublic ==. True ] ||.
+                [ RoutineIsPublic ==. False, RoutineAuthor ==. userId ]
 
 instance GuardCRUD Section where
     guardCreate _ Nothing =
@@ -215,6 +238,11 @@ instance GuardCRUD Section where
     -- for a Routine.
     guardDelete (Entity _ section) =
         guardCreate section
+
+    -- | Defer filtering to the Routine Resource's `guardList`
+    -- implementation.
+    guardList =
+        guardListByRelation SectionRoutine
 
 instance GuardCRUD SectionExercise where
     guardCreate _ Nothing =
@@ -233,6 +261,11 @@ instance GuardCRUD SectionExercise where
     -- SectionExercises for a Routine.
     guardDelete (Entity _ sectionExercise) =
         guardCreate sectionExercise
+
+    -- | Defer filtering to the Section Resource's `guardList`
+    -- implementation(which defers to Routine's `guardList` implementation).
+    guardList =
+        guardListByRelation SectionExerciseSection
 
 instance GuardCRUD Exercise where
     -- | Only Admins should be able to Create Exercises
@@ -256,3 +289,12 @@ userIsAuthorOrAdmin (Entity userId user) maybeRoutineM = do
             lift $ throwE err404
         Just routine ->
             unless (routineAuthor routine == userId || userIsAdmin user) forbidden
+
+-- | A helper function to defer guarding a List route to a Relation's guard.
+guardListByRelation :: ( PersistEntityBackend r ~ SqlBackend, PersistEntity r
+                       , GuardCRUD r)
+                    => EntityField v (Key r) -> Maybe (Entity User) -> AppM [Filter v]
+guardListByRelation foreignKey maybeUser = do
+        relationFilters <- guardList maybeUser
+        ids <- runDB $ selectKeysList relationFilters []
+        return [ foreignKey <-. ids ]
