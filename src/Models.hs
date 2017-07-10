@@ -196,6 +196,12 @@ class GuardCRUD a where
     guardList _ =
         return []
 
+    -- | Guard the View Route. The default instance will allow anyone to
+    -- see the details of a Resource.
+    guardView :: Entity a -> Maybe (Entity User) -> AppM ()
+    guardView _ _ =
+        return ()
+
 instance GuardCRUD Subscription
 instance GuardCRUD RoutineLog
 
@@ -226,6 +232,18 @@ instance GuardCRUD Routine where
                 [ RoutineIsPublic ==. True ] ||.
                 [ RoutineIsPublic ==. False, RoutineAuthor ==. userId ]
 
+    -- | Anonymous Users cannot view Private Routines.
+    guardView (Entity _ routine) Nothing =
+        unless (routineIsPublic routine) forbidden
+    -- | Authorized Users can view their own Private Routines, while
+    -- Administrators can view all Routines.
+    guardView (Entity _ routine) (Just (Entity userId user)) =
+        if userIsAdmin user then
+            return ()
+        else
+            unless (routineIsPublic routine || routineAuthor routine == userId)
+                forbidden
+
 instance GuardCRUD Section where
     guardCreate _ Nothing =
         forbidden
@@ -243,6 +261,11 @@ instance GuardCRUD Section where
     -- implementation.
     guardList =
         guardListByRelation SectionRoutine
+
+    -- | Defer permission check to the Routine Resource's `guardView'
+    -- implementation.
+    guardView (Entity _ section) maybeUser =
+        guardViewByRelation maybeUser $ sectionRoutine section
 
 instance GuardCRUD SectionExercise where
     guardCreate _ Nothing =
@@ -266,6 +289,11 @@ instance GuardCRUD SectionExercise where
     -- implementation(which defers to Routine's `guardList` implementation).
     guardList =
         guardListByRelation SectionExerciseSection
+
+    -- | Defer permission check to the Section Resource's `guardView`
+    -- implementation.
+    guardView (Entity _ sectionExercise) maybeUser =
+        guardViewByRelation maybeUser $ sectionExerciseSection sectionExercise
 
 instance GuardCRUD Exercise where
     -- | Only Admins should be able to Create Exercises
@@ -295,6 +323,18 @@ guardListByRelation :: ( PersistEntityBackend r ~ SqlBackend, PersistEntity r
                        , GuardCRUD r)
                     => EntityField v (Key r) -> Maybe (Entity User) -> AppM [Filter v]
 guardListByRelation foreignKey maybeUser = do
-        relationFilters <- guardList maybeUser
-        ids <- runDB $ selectKeysList relationFilters []
-        return [ foreignKey <-. ids ]
+    relationFilters <- guardList maybeUser
+    ids <- runDB $ selectKeysList relationFilters []
+    return [ foreignKey <-. ids ]
+
+-- | A helper function to defer guarding a View route to a Related Resource.
+guardViewByRelation :: ( PersistEntityBackend r ~ SqlBackend, PersistEntity r
+                       , GuardCRUD r )
+                    => Maybe (Entity User) -> Key r -> AppM ()
+guardViewByRelation maybeUser foreignKey = do
+    maybeItem <- runDB $ get foreignKey
+    case maybeItem of
+        Nothing ->
+            lift $ throwE err404
+        Just item ->
+            guardView (Entity foreignKey item) maybeUser

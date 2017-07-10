@@ -23,7 +23,8 @@ type CRUD resource =
    :<|> AuthProtect "token-auth"
         :> ReqBody '[JSON] (JSONObject resource)
         :> Post '[JSON] (JSONObject (Entity resource))
-   :<|> Capture "id" (Key resource)
+   :<|> AuthProtect "token-auth"
+        :> Capture "id" (Key resource)
         :> Get '[JSON] (JSONObject (Entity resource))
    :<|> AuthProtect "token-auth"
         :> Capture "id" (Key resource)
@@ -36,7 +37,7 @@ type CRUD resource =
 type CRUDRoutes resource =
          (Maybe TokenString -> AppM (JSONList (Entity resource)))
     :<|> ((Maybe TokenString -> JSONObject resource -> AppM (JSONObject (Entity resource)))
-    :<|> ((Key resource -> AppM (JSONObject (Entity resource)))
+    :<|> ((Maybe TokenString -> Key resource -> AppM (JSONObject (Entity resource)))
     :<|> ((Maybe TokenString -> Key resource -> JSONObject resource -> AppM (JSONObject (Entity resource)))
     :<|> (Maybe TokenString -> Key resource -> AppM ()))))
 
@@ -70,13 +71,17 @@ createRoute maybeToken (JSONObject item) = do
 
 -- | The `viewRoute` returns a single JSON object representing a Persistent
 -- Entity.
-viewRoute :: (PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r)
-          => Key r -> AppM (JSONObject (Entity r))
-viewRoute key =  do
+viewRoute :: ( PersistEntityBackend r ~ SqlBackend, ToBackendKey SqlBackend r
+             , GuardCRUD r )
+          => Maybe TokenString -> Key r -> AppM (JSONObject (Entity r))
+viewRoute maybeToken key =  do
         maybeItem <- runDB $ get key
         case maybeItem of
-            Nothing -> lift $ throwE err404
-            Just value -> return $ JSONObject (Entity key value)
+            Nothing ->
+                lift $ throwE err404
+            Just item ->
+                mapTokenToGuard maybeToken (guardView $ Entity key item) >>
+                return (JSONObject (Entity key item))
 
 -- | The `updateRoute` attempts to update an Entity using a JSON request
 -- body and returns the new Entity.
