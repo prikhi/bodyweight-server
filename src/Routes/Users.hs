@@ -106,20 +106,20 @@ registrationRoute data_ = do
 -- | Log a user in by validating their password & returning their User data.
 loginRoute :: LoginData -> AppM (JSONObject (Entity User))
 loginRoute LoginData { loginName, loginPassword } = do
-        maybeUser <- runDB . getBy $ UniqueUserName loginName
-        case maybeUser of
-            Nothing ->
-                lift . throwE $ err404
-            Just userEntity@(Entity _ user) ->
-                let
-                    validPassword =
-                        validatePassword (encodeUtf8 $ userEncryptedPassword user)
-                            (encodeUtf8 loginPassword)
-                in
-                    if validPassword then
-                        return . JSONObject $ userEntity
-                    else
-                        lift . throwE $ err404
+    maybeUser <- runDB . getBy $ UniqueUserName loginName
+    case maybeUser of
+        Nothing ->
+            lift . throwE $ err404
+        Just userEntity@(Entity _ user) ->
+            let
+                validPassword =
+                    validatePassword (encodeUtf8 $ userEncryptedPassword user)
+                        (encodeUtf8 loginPassword)
+            in
+                if validPassword then
+                    return . JSONObject $ userEntity
+                else
+                    lift . throwE $ err404
 
 
 -- | Re-Authorize a User using their Auth Token.
