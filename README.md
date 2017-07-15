@@ -27,8 +27,6 @@ make
     * Document expected Environmental Variables
 * User Auth
     * Add User/Subscriber field to RoutineLogs
-    * When checking passwords against hashes, make sure the hash uses the
-      latest hashing policy(and update it if it doesn't)
 * Refactor all the `lift $ throwE` calls into a `serverError` function
     * Add some helpers for common  codes, like `notFound` & `forbidden`
     * Maybe rename `Types` module to `Server` and add these helper functions?

@@ -11,7 +11,7 @@ module Routes.Users
     , userRoutes
     ) where
 
-import Control.Monad.Reader (lift, liftIO)
+import Control.Monad.Reader (lift, liftIO, unless)
 import Control.Monad.Trans.Except   (throwE)
 import Crypto.BCrypt
 import Data.Aeson (FromJSON)
@@ -87,20 +87,14 @@ userRoutes =
 -- | Register a User by creating a User & Token for them.
 registrationRoute :: RegistrationData -> AppM (JSONObject (Entity User))
 registrationRoute data_ = do
-    pass <- do
-        maybePass <- liftIO . encryptPassword . encodeUtf8 $ registrationPassword data_
-        case maybePass of
-            Nothing ->
-                lift . throwE $ err500 { errBody = "Misconfigured Salt" }
-            Just pass ->
-                return $ decodeUtf8 pass
+    pass <- hashTextPassword (registrationPassword data_) >>=
+                maybe (lift . throwE $ err500 { errBody = "Misconfigured Salt" })
+                (return)
     token <- UUID.toText <$> liftIO UUID4.nextRandom
     let user = User (registrationName data_) (registrationEmail data_)
                     pass token False
     userId <- runDB $ insert user
     return . JSONObject $ Entity userId user
-    where encryptPassword =
-            hashPasswordUsingPolicy slowerBcryptHashingPolicy
 
 
 -- | Log a user in by validating their password & returning their User data.
@@ -112,14 +106,26 @@ loginRoute LoginData { loginName, loginPassword } = do
             lift . throwE $ err404
         Just userEntity@(Entity _ user) ->
             let
-                validPassword =
+                isValidPassword =
                     validatePassword (encodeUtf8 $ userEncryptedPassword user)
                         (encodeUtf8 loginPassword)
             in
-                if validPassword then
-                    return . JSONObject $ userEntity
+                if isValidPassword then
+                    rehashPassword userEntity >> return (JSONObject userEntity)
                 else
                     lift . throwE $ err404
+    where -- Rehash the password & Update the User if the saved hash uses
+          -- an older HashingPolicy.
+          rehashPassword (Entity userId user) =
+            let
+                hashedPassword =
+                    encodeUtf8 $ userEncryptedPassword user
+
+                updateUser newHash =
+                    runDB . replace userId $ user { userEncryptedPassword = newHash }
+            in
+                unless (hashUsesPolicy slowerBcryptHashingPolicy hashedPassword) $
+                    hashTextPassword loginPassword >>= (maybe (return ()) updateUser)
 
 
 -- | Re-Authorize a User using their Auth Token.
@@ -130,3 +136,11 @@ reauthorizeRoute ReauthData { authToken, authUserId } = do
         return $ JSONObject userEntity
     else
         lift $ throwE err404
+
+
+-- | Try to hash a plain text password using the `slowerBcryptHashingPolicy`.
+hashTextPassword :: T.Text -> AppM (Maybe T.Text)
+hashTextPassword password =
+    liftIO . fmap (fmap decodeUtf8) $
+        hashPasswordUsingPolicy slowerBcryptHashingPolicy $
+        encodeUtf8 password
