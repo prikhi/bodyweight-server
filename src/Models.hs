@@ -238,11 +238,8 @@ instance GuardCRUD Routine where
     -- | Authorized Users can view their own Private Routines, while
     -- Administrators can view all Routines.
     guardView (Entity _ routine) (Just (Entity userId user)) =
-        if userIsAdmin user then
-            return ()
-        else
-            unless (routineIsPublic routine || routineAuthor routine == userId)
-                forbidden
+        unless (routineIsPublic routine || routineAuthor routine == userId || userIsAdmin user)
+            forbidden
 
 instance GuardCRUD Section where
     guardCreate _ Nothing =
