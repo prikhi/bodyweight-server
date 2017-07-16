@@ -16,10 +16,12 @@ import Config       (Config(..))
 
 type AppM =
     ReaderT Config (ExceptT ServantErr IO)
-type OMSQL m b =
-    (MonadIO m, MonadReader Config m) => SqlPersistT IO b -> m b
 
-runDB :: OMSQL m a
+type AppSQL m a =
+    (MonadIO m, MonadReader Config m) => SqlPersistT IO a -> m a
+
+
+runDB :: AppSQL m a
 runDB query =
     asks getPool >>= liftIO . runSqlPool query
 
