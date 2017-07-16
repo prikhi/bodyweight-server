@@ -9,6 +9,8 @@ import Api    (app)
 import Models (doMigrations)
 
 
+-- | Grab Settings From Environmental Variables, Connect to the Database,
+-- & Launch the Web Server.
 main :: IO ()
 main = do
     env  <- lookupSetting "ENV" Development
@@ -17,7 +19,5 @@ main = do
     let cfg = defaultConfig { getPool = pool, getEnv = env }
     runSqlPool doMigrations pool
     run port $ setLogger env $ app cfg
-    where lookupSetting env def = do
-            mValue <- lookupEnv env
-            return $ case mValue of Nothing -> def
-                                    Just a  -> read a
+    where lookupSetting env def =
+            maybe def read <$> lookupEnv env

@@ -36,7 +36,7 @@ authHandler =
         handler request =
             return . fmap decodeUtf8 $ lookup "Auth-Token" (requestHeaders request)
     in
-    mkAuthHandler handler
+        mkAuthHandler handler
 
 
 -- | The Token AuthHandler is denoted by the `AuthProtect "token-auth"`

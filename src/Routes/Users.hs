@@ -140,7 +140,7 @@ reauthorizeRoute ReauthData { authToken, authUserId } = do
 
 -- | Try to hash a plain text password using the `slowerBcryptHashingPolicy`.
 hashTextPassword :: T.Text -> AppM (Maybe T.Text)
-hashTextPassword password =
-    liftIO . fmap (fmap decodeUtf8) $
-        hashPasswordUsingPolicy slowerBcryptHashingPolicy $
-        encodeUtf8 password
+hashTextPassword =
+    liftIO . fmap (fmap decodeUtf8) .
+        hashPasswordUsingPolicy slowerBcryptHashingPolicy .
+        encodeUtf8

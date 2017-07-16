@@ -32,22 +32,24 @@ readerToExcept cfg = Nat $ \x -> runReaderT x cfg
 api :: Proxy API
 api = Proxy
 
-type API = "users" :> UserAPI
-      :<|> "subscriptions" :> SubscriptionAPI
-      :<|> "routines" :> RoutineAPI
-      :<|> "sections" :> SectionAPI
-      :<|> "sectionExercises" :> SectionExerciseAPI
-      :<|> "exercises" :> ExerciseAPI
-      :<|> "routineLogs" :> RoutineLogAPI
+type API = 
+        "users" :> UserAPI
+   :<|> "subscriptions" :> SubscriptionAPI
+   :<|> "routines" :> RoutineAPI
+   :<|> "sections" :> SectionAPI
+   :<|> "sectionExercises" :> SectionExerciseAPI
+   :<|> "exercises" :> ExerciseAPI
+   :<|> "routineLogs" :> RoutineLogAPI
 
 server :: ServerT API AppM
-server = userRoutes
-    :<|> subscriptionRoutes
-    :<|> routineRoutes
-    :<|> sectionRoutes
-    :<|> sectionExerciseRoutes
-    :<|> exerciseRoutes
-    :<|> routineLogRoutes
+server = 
+        userRoutes
+   :<|> subscriptionRoutes
+   :<|> routineRoutes
+   :<|> sectionRoutes
+   :<|> sectionExerciseRoutes
+   :<|> exerciseRoutes
+   :<|> routineLogRoutes
 
 type SubscriptionAPI = CRUD Subscription
 subscriptionRoutes :: CRUDRoutes Subscription

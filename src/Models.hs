@@ -96,7 +96,6 @@ RoutineLog json
 doMigrations :: ReaderT SqlBackend IO ()
 doMigrations = runMigration migrateAll
 
-
 -- | Hide the encrypted password when converting a User to JSON.
 instance ToJSON (Entity User) where
     toJSON (Entity userId user) =
@@ -122,31 +121,34 @@ instance Named Exercise where name _ = "exercise"
 instance Named RoutineLog where name _ = "routineLog"
 
 instance Named a => Named (Entity a) where
-        name _ = name (Proxy :: Proxy a)
+    name _ = name (Proxy :: Proxy a)
 
 
 newtype JSONList a = JSONList [a]
 instance (FromJSON a, Named a) => FromJSON (JSONList a) where
-        parseJSON (Object o) = do
-            named <- o .: name (Proxy :: Proxy a) >>= parseJSON
-            return $ JSONList [named]
-        parseJSON _          = mzero
+    parseJSON (Object o) = do
+        named <- o .: name (Proxy :: Proxy a) >>= parseJSON
+        return $ JSONList [named]
+    parseJSON _          =
+        mzero
 instance (ToJSON a, Named a) => ToJSON (JSONList a) where
-        toJSON (JSONList l)  = object [name (Proxy :: Proxy a) .= map toJSON l]
+    toJSON (JSONList l)  = object [name (Proxy :: Proxy a) .= map toJSON l]
 
 newtype JSONObject a = JSONObject a
 instance (FromJSON a, Named a) => FromJSON (JSONObject a) where
-        parseJSON (Object o) = do
-            named <- o .: name (Proxy :: Proxy a) >>= parseJSON
-            return $ JSONObject named
-        parseJSON _          = mzero
+    parseJSON (Object o) = do
+        named <- o .: name (Proxy :: Proxy a) >>= parseJSON
+        return $ JSONObject named
+    parseJSON _          =
+        mzero
 instance (ToJSON a, Named a) => ToJSON (JSONObject a) where
         toJSON (JSONObject a)  = object [name (Proxy :: Proxy a) .= toJSON a]
 
 
 class DeleteRelated a where
-        deleteRelated :: (MonadIO m) => Key a -> ReaderT SqlBackend m ()
-        deleteRelated _ = return ()
+    deleteRelated :: (MonadIO m) => Key a -> ReaderT SqlBackend m ()
+    deleteRelated _ =
+        return ()
 
 instance DeleteRelated Subscription
 instance DeleteRelated SectionExercise
@@ -154,16 +156,16 @@ instance DeleteRelated Exercise
 instance DeleteRelated RoutineLog
 
 instance DeleteRelated User where
-        deleteRelated key =
-            deleteWhere [SubscriptionUser ==. key]
+    deleteRelated key =
+        deleteWhere [SubscriptionUser ==. key]
 instance DeleteRelated Routine where
-        deleteRelated key = do
-            sections <- selectList [SectionRoutine ==. key] []
-            mapM_ (\(Entity k _) -> deleteRelated k) sections
-            deleteWhere [SectionRoutine ==. key]
+    deleteRelated key = do
+        sections <- selectList [SectionRoutine ==. key] []
+        mapM_ (\(Entity k _) -> deleteRelated k) sections
+        deleteWhere [SectionRoutine ==. key]
 instance DeleteRelated Section where
-        deleteRelated key =
-            deleteWhere [SectionExerciseSection ==. key]
+    deleteRelated key =
+        deleteWhere [SectionExerciseSection ==. key]
 
 
 -- | The GuardCRUD Typeclass is used to verify the user has the correct

@@ -8,20 +8,23 @@ import Network.Wai                          (Middleware)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev, logStdout)
 
 
-data Config = Config
-            { getPool :: ConnectionPool
-            , getEnv :: Environment
-            }
-data Environment = Production
-                 | Development
-                 | Test
-                 deriving (Eq, Show, Read)
+data Config
+    = Config
+    { getPool :: ConnectionPool
+    , getEnv :: Environment
+    }
+data Environment
+    = Production
+    | Development
+    | Test
+    deriving (Eq, Show, Read)
 
 defaultConfig :: Config
-defaultConfig = Config
-              { getPool = undefined
-              , getEnv  = Development
-              }
+defaultConfig =
+    Config
+        { getPool = undefined
+        , getEnv  = Development
+        }
 
 setLogger :: Environment -> Middleware
 setLogger Test = id

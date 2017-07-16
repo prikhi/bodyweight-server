@@ -14,17 +14,25 @@ import Servant
 import Config       (Config(..))
 
 
-type AppM = ReaderT Config (ExceptT ServantErr IO)
-type OMSQL m b = (MonadIO m, MonadReader Config m) => SqlPersistT IO b -> m b
+type AppM =
+    ReaderT Config (ExceptT ServantErr IO)
+type OMSQL m b =
+    (MonadIO m, MonadReader Config m) => SqlPersistT IO b -> m b
 
 runDB :: OMSQL m a
-runDB query = asks getPool >>= liftIO . runSqlPool query
+runDB query =
+    asks getPool >>= liftIO . runSqlPool query
 
 
 -- | A Persistent Key wrapped in a newtype so that we can derive the
 -- FromText & ToText instances necessary for Servant's routing.
-newtype PKey a = PKey { fromPKey :: Int64
-                      } deriving (FromJSON, ToJSON)
+newtype PKey a
+    = PKey
+    { fromPKey :: Int64
+    } deriving (FromJSON, ToJSON)
+
+
 -- | Retrieve a Persistent SQL Key out of a PKey value.
 _PKey :: ToBackendKey SqlBackend a => PKey a -> Key a
-_PKey pKey = toSqlKey $ fromPKey pKey
+_PKey pKey =
+    toSqlKey $ fromPKey pKey
