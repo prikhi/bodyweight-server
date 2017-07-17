@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Models where
 
-import Control.Monad                (mzero, unless)
+import Control.Monad                (mzero, unless, when)
 import Control.Monad.Reader         (ReaderT, MonadIO, lift)
 import Control.Monad.Trans.Except   (throwE)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
@@ -23,7 +23,7 @@ import Database.Persist.Postgresql  (PersistEntityBackend, PersistEntity,
                                      SqlBackend(..), runMigration, Entity(..),
                                      EntityField, Key, deleteWhere, get,
                                      selectList, Filter, selectKeysList,
-                                     (==.), (||.), (<-.))
+                                     toSqlKey, (==.), (||.), (<-.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
 import Servant                      (err403, err404)
@@ -204,7 +204,6 @@ class GuardCRUD a where
     guardView _ _ =
         return ()
 
-instance GuardCRUD Subscription
 instance GuardCRUD RoutineLog
 
 instance GuardCRUD Routine where
@@ -300,6 +299,32 @@ instance GuardCRUD Exercise where
         forbidden
     guardCreate _ (Just (Entity _ user)) =
         unless (userIsAdmin user) forbidden
+
+
+instance GuardCRUD Subscription where
+    guardCreate _ Nothing =
+        forbidden
+    -- | Only Users may subscribe themselves to a Routine.
+    guardCreate subscription (Just (Entity userId _)) =
+        when (userId /= subscriptionUser subscription) forbidden
+
+    -- | Only Users can delete their own Subscriptions.
+    guardDelete (Entity _ subscription) =
+        guardCreate subscription
+
+    -- | Users can only list their own Subscriptions.
+    guardList Nothing =
+        return [ SubscriptionUser ==. toSqlKey 0
+               ]
+    guardList (Just (Entity userId _)) =
+        return [ SubscriptionUser ==. userId
+               ]
+
+    -- | Only a User can view the details of their Subscription.
+    guardView (Entity _ subscription) =
+        guardCreate subscription
+
+
 
 -- | A helper function that can be used when a guard should return a 403
 -- error.
