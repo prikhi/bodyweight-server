@@ -7,14 +7,13 @@ module Routes
     , CRUDRoutes
     , crudRoutes
     ) where
-import Control.Monad.Reader         (lift)
-import Control.Monad.Trans.Except   (throwE)
+
 import Database.Persist.Postgresql
 import Servant
 
 import Auth
 import Models
-import Types
+import Server                       (AppM, runDB, notFound)
 
 
 type CRUD resource =
@@ -79,7 +78,7 @@ viewRoute maybeToken key = do
     maybeItem <- runDB $ get key
     case maybeItem of
         Nothing ->
-            lift $ throwE err404
+            notFound
         Just item ->
             mapTokenToGuard maybeToken (guardView $ Entity key item) >>
             return (JSONObject (Entity key item))
@@ -103,7 +102,7 @@ deleteRoute maybeToken key = do
     maybeItem <- runDB $ get key
     case maybeItem of
         Nothing ->
-            lift $ throwE err404
+            notFound
         Just item ->
             mapTokenToGuard maybeToken (guardDelete $ Entity key item) >>
             runDB (deleteRelated key >> delete key)

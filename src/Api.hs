@@ -12,9 +12,9 @@ import Servant
 import Auth
 import Config
 import Models
-import Types
 import Routes
 import Routes.Users
+import Server
 
 
 -- Application

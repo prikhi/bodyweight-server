@@ -11,8 +11,7 @@ module Routes.Users
     , userRoutes
     ) where
 
-import Control.Monad.Reader (lift, liftIO, unless)
-import Control.Monad.Trans.Except   (throwE)
+import Control.Monad.Reader (liftIO, unless)
 import Crypto.BCrypt
 import Data.Aeson (FromJSON)
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -25,8 +24,8 @@ import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID4
 
 import Auth (lookupUser)
-import Types
 import Models
+import Server (AppM, runDB, servantError, notFound)
 
 
 -- | The expected data when registering a User.
@@ -88,7 +87,7 @@ userRoutes =
 registrationRoute :: RegistrationData -> AppM (JSONObject (Entity User))
 registrationRoute data_ = do
     pass <- hashTextPassword (registrationPassword data_) >>=
-                maybe (lift . throwE $ err500 { errBody = "Misconfigured Salt" })
+                maybe (servantError $ err500 { errBody = "Misconfigured Salt" })
                 (return)
     token <- UUID.toText <$> liftIO UUID4.nextRandom
     let user = User (registrationName data_) (registrationEmail data_)
@@ -103,7 +102,7 @@ loginRoute LoginData { loginName, loginPassword } = do
     maybeUser <- runDB . getBy $ UniqueUserName loginName
     case maybeUser of
         Nothing ->
-            lift . throwE $ err404
+            notFound
         Just userEntity@(Entity _ user) ->
             let
                 isValidPassword =
@@ -113,7 +112,7 @@ loginRoute LoginData { loginName, loginPassword } = do
                 if isValidPassword then
                     rehashPassword userEntity >> return (JSONObject userEntity)
                 else
-                    lift . throwE $ err404
+                    notFound
     where -- Rehash the password & Update the User if the saved hash uses
           -- an older HashingPolicy.
           rehashPassword (Entity userId user) =
@@ -135,7 +134,7 @@ reauthorizeRoute ReauthData { authToken, authUserId } = do
     if authUserId == userId then
         return $ JSONObject userEntity
     else
-        lift $ throwE err404
+        notFound
 
 
 -- | Try to hash a plain text password using the `slowerBcryptHashingPolicy`.

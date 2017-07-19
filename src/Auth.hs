@@ -4,8 +4,6 @@
 {-# LANGUAGE TypeOperators #-}
 module Auth where
 
-import Control.Monad.Reader (lift)
-import Control.Monad.Trans.Except (throwE)
 import Data.Text.Encoding (decodeUtf8)
 import Database.Persist.Postgresql
 import Servant (err401, errBody, AuthProtect, Context(..))
@@ -15,7 +13,7 @@ import Network.Wai (Request, requestHeaders)
 import qualified Data.Text as T
 
 import Models
-import Types
+import Server   (AppM, runDB, servantError)
 
 
 -- | A Token is representing by Text.
@@ -26,7 +24,7 @@ type TokenString = T.Text
 lookupUser :: TokenString -> AppM (Entity User)
 lookupUser tokenString =
     (runDB . getBy $ UniqueToken tokenString) >>=
-    maybe (lift $ throwE err401 { errBody = "Invalid Token" }) return
+    maybe (servantError $ err401 { errBody = "Invalid Token" }) return
 
 
 -- | Pull an Optional Token from the `Auth-Token` Header.

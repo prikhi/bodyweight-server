@@ -12,8 +12,7 @@
 module Models where
 
 import Control.Monad                (mzero, unless, when)
-import Control.Monad.Reader         (ReaderT, MonadIO, lift)
-import Control.Monad.Trans.Except   (throwE)
+import Control.Monad.Reader         (ReaderT, MonadIO)
 import Data.Aeson                   (FromJSON(..), ToJSON(..), (.=), (.:),
                                      object, Value(..))
 import Data.Proxy                   (Proxy(..))
@@ -26,11 +25,10 @@ import Database.Persist.Postgresql  (PersistEntityBackend, PersistEntity,
                                      toSqlKey, (==.), (||.), (<-.))
 import Database.Persist.TH          (share, mkPersist, sqlSettings, mkMigrate,
                                      persistLowerCase)
-import Servant                      (err403, err404)
 
 import qualified Data.Text       as T
 
-import Types
+import Server                       (AppM, runDB, forbidden, notFound)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 User
@@ -326,19 +324,13 @@ instance GuardCRUD Subscription where
 
 
 
--- | A helper function that can be used when a guard should return a 403
--- error.
-forbidden :: AppM b
-forbidden =
-    lift $ throwE err403
-
 -- | A helper function to verify a User is a Routine's Author or an Admin.
 userIsAuthorOrAdmin :: Entity User -> AppM (Maybe Routine) -> AppM ()
 userIsAuthorOrAdmin (Entity userId user) maybeRoutineM = do
     maybeRoutine <- maybeRoutineM
     case maybeRoutine of
         Nothing ->
-            lift $ throwE err404
+            notFound
         Just routine ->
             unless (routineAuthor routine == userId || userIsAdmin user) forbidden
 
@@ -359,6 +351,6 @@ guardViewByRelation maybeUser foreignKey = do
     maybeItem <- runDB $ get foreignKey
     case maybeItem of
         Nothing ->
-            lift $ throwE err404
+            notFound
         Just item ->
             guardView (Entity foreignKey item) maybeUser
