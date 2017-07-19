@@ -88,7 +88,7 @@ registrationRoute :: RegistrationData -> AppM (JSONObject (Entity User))
 registrationRoute data_ = do
     pass <- hashTextPassword (registrationPassword data_) >>=
                 maybe (servantError $ err500 { errBody = "Misconfigured Salt" })
-                (return)
+                return
     token <- UUID.toText <$> liftIO UUID4.nextRandom
     let user = User (registrationName data_) (registrationEmail data_)
                     pass token False
@@ -124,7 +124,7 @@ loginRoute LoginData { loginName, loginPassword } = do
                     runDB . replace userId $ user { userEncryptedPassword = newHash }
             in
                 unless (hashUsesPolicy slowerBcryptHashingPolicy hashedPassword) $
-                    hashTextPassword loginPassword >>= (maybe (return ()) updateUser)
+                    hashTextPassword loginPassword >>= maybe (return ()) updateUser
 
 
 -- | Re-Authorize a User using their Auth Token.
