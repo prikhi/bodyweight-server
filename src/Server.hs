@@ -4,7 +4,6 @@
 module Server where
 
 import Control.Monad.Reader         (ReaderT, asks, liftIO, lift)
-import Control.Monad.Trans.Except   (ExceptT, throwE)
 import Data.Aeson                   (FromJSON(..), ToJSON(..))
 import Data.Int                     (Int64)
 import Database.Persist.Postgresql  (SqlPersistT, runSqlPool, ToBackendKey, Key, toSqlKey, SqlBackend)
@@ -17,7 +16,7 @@ import Config                       (Config(..))
 -- monad with Servant errors, wrapped in a Reader holding our Config
 -- values.
 type AppM =
-    ReaderT Config (ExceptT ServantErr IO)
+    ReaderT Config Handler
 
 -- | AppSQL represents the lifting of SQL actions into our `AppM` monad.
 type AppSQL a =
@@ -49,7 +48,7 @@ _PKey pKey =
 -- | Lift a Servant Error into the `AppM` monad.
 servantError :: ServantErr -> AppM a
 servantError =
-    lift . throwE
+    lift . throwError
 
 -- | Return a 403 Response.
 forbidden :: AppM a

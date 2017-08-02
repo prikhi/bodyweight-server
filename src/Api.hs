@@ -5,7 +5,6 @@ module Api
     ) where
 
 import Control.Monad.Reader             (runReaderT)
-import Control.Monad.Trans.Except       (ExceptT)
 import Network.Wai                      (Application)
 import Servant
 
@@ -24,15 +23,15 @@ app cfg = serveWithContext api authServerContext (readerServer cfg)
 readerServer :: Config -> Server API
 readerServer cfg = enter (readerToExcept cfg) server
 
-readerToExcept :: Config -> AppM :~> ExceptT ServantErr IO
-readerToExcept cfg = Nat $ \x -> runReaderT x cfg
+readerToExcept :: Config -> AppM :~> Handler
+readerToExcept cfg = NT $ \x -> runReaderT x cfg
 
 
 -- API
 api :: Proxy API
 api = Proxy
 
-type API = 
+type API =
         "users" :> UserAPI
    :<|> "subscriptions" :> SubscriptionAPI
    :<|> "routines" :> RoutineAPI
@@ -42,7 +41,7 @@ type API =
    :<|> "routineLogs" :> RoutineLogAPI
 
 server :: ServerT API AppM
-server = 
+server =
         userRoutes
    :<|> subscriptionRoutes
    :<|> routineRoutes
